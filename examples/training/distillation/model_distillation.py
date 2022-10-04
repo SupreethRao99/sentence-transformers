@@ -30,7 +30,7 @@ logging.basicConfig(
 
 
 class DistillationDataset:
-    def __int__(self):
+    def __init__(self):
         self.dataset_dict = {
             "datasets/AllNLI.tsv.gz": "https://sbert.net/datasets/AllNLI.tsv.gz",
             "datasets/wikipedia-en-sentences.txt.gz": "https://sbert.net/datasets/wikipedia-en-sentences.txt.gz",
@@ -135,7 +135,6 @@ def prepare_models(
 
 
 def compute_pca(teacher_model, student_model):
-    pca_flag = False  # check if PCA is performed
     if (
         student_model.get_sentence_embedding_dimention()
         < teacher_model.get_sentence_embedding_dimension()
@@ -145,7 +144,7 @@ def compute_pca(teacher_model, student_model):
             "Compute PCA for down projection"
         )
 
-        pca_dataset = DistillationDataset
+        pca_dataset = DistillationDataset()
         train_sentences_nli, _ = pca_dataset.read_allnli()
         train_sentences_wikipedia, _ = pca_dataset.read_wikipedia()
         pca_sentences = train_sentences_nli[:20000] + train_sentences_wikipedia[:20000]
@@ -170,9 +169,8 @@ def compute_pca(teacher_model, student_model):
                 teacher_model.get_sentence_embedding_dimension()
             )
         )
-        pca_flag = True
 
-    return teacher_model, student_model, pca_flag
+    return teacher_model, student_model
 
 
 if __name__ == "__main__":
@@ -193,9 +191,11 @@ if __name__ == "__main__":
         help="Layer reduction uses the same architecture for both teacher and "
         "student but with fewer layers in the student model",
     )
-    parser.add_argument("--train-batch-size", default=512, help="training batch size")
     parser.add_argument(
-        "--inference-batch-size", default=512, help="inference batch size"
+        "--train-batch-size", default=64, help="training batch size"
+    )
+    parser.add_argument(
+        "--inference-batch-size", default=64, help="inference batch size"
     )
     parser.add_argument(
         "--output_dir",
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         use_layer_reduction=args.layer_reduction,
     )
 
-    dataset = DistillationDataset
+    dataset = DistillationDataset()
     train_sentences_nli, dev_sentences_nli = dataset.read_allnli()
     train_sentences_wikipedia, dev_sentences_wikipedia = dataset.read_wikipedia()
     sts_devset = dataset.read_sts_benchmark()
@@ -219,14 +219,14 @@ if __name__ == "__main__":
     dev_evaluator_sts = evaluation.EmbeddingSimilarityEvaluator.from_input_examples(
         sts_devset, name="sts-dev"
     )
+
     logging.info("Teacher Performance:")
     dev_evaluator_sts(teacher_model)
 
-    teacher_model, student_model, pca_flag = compute_pca(
-        teacher_model=teacher_model, student_model=student_model
-    )
-    if pca_flag:
-        # Evaluating Teacher model after PCA
+    if not args.layer_reduction:
+        teacher_model, student_model = compute_pca(
+            teacher_model=teacher_model, student_model=student_model
+        )
         dev_evaluator_sts(teacher_model)
 
     train_data = ParallelSentencesDataset(
@@ -266,4 +266,3 @@ if __name__ == "__main__":
         optimizer_params={"lr": 1e-4, "eps": 1e-6},
         use_amp=True,
     )
-    student_model.save_to_hub(repo_name='distil-TinyBERT')
