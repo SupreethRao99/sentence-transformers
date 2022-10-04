@@ -192,10 +192,10 @@ if __name__ == "__main__":
         "student but with fewer layers in the student model",
     )
     parser.add_argument(
-        "--train-batch-size", default=64, help="training batch size"
+        "--train-batch-size", default=512, help="training batch size"
     )
     parser.add_argument(
-        "--inference-batch-size", default=64, help="inference batch size"
+        "--inference-batch-size", default=512, help="inference batch size"
     )
     parser.add_argument(
         "--output_dir",
